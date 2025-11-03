@@ -1,44 +1,73 @@
-import express from 'express';
-import mongoose from 'mongoose';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import authRoutes from './routes/auth.js';
-import calorieRoutes from './routes/calories.js';
-import recipeRoutes from './routes/recipes.js';
-import userRoutes from './routes/user.js';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
+// ✅ Update this with your actual Netlify frontend URL
+const allowedOrigins = [
+  "https://kalories123.netlify.app", // 👈 replace with your real Netlify site URL
+  "http://localhost:5173", // 👈 for local development (Vite default)
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/calories', calorieRoutes);
-app.use('/api/recipes', recipeRoutes);
-app.use('/api/user', userRoutes);
+// ✅ Initialize Supabase client
+const supabase = createClient(
+  "https://ekfumusrqyknppmguoyk.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVrZnVtdXNycXlrbnBwbWd1b3lrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwOTY2NTAsImV4cCI6MjA3NzY3MjY1MH0.80xZFj50BX4WDIdmNQDwe__FzgWI5osJK3gtyC5u2uE"
+);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+// ✅ Root route
+app.get("/", (req, res) => {
+  res.send("✅ Backend is running and connected to Supabase!");
 });
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/calorie-tracker')
-  .then(() => {
-    console.log('✅ Connected to MongoDB');
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error('❌ MongoDB connection error:', error);
-  });
+// ✅ Test route
+app.get("/test", async (req, res) => {
+  const { data, error } = await supabase.from("calories").select("*");
+  if (error) return res.status(400).json({ error });
+  res.json(data);
+});
 
-export default app;
+// ✅ Add a new calorie item
+app.post("/add", async (req, res) => {
+  const { item, calories } = req.body;
+  const { data, error } = await supabase.from("calories").insert([{ item, calories }]);
+  if (error) return res.status(400).json({ error });
+  res.json({ success: true, data });
+});
+
+// ✅ Fetch all items
+app.get("/get", async (req, res) => {
+  const { data, error } = await supabase
+    .from("calories")
+    .select("*")
+    .order("id", { ascending: false });
+  if (error) return res.status(400).json({ error });
+  res.json(data);
+});
+
+// ✅ Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+
+
 
